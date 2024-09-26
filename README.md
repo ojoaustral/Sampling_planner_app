@@ -30,11 +30,11 @@ The app provides an interactive interface for users to:
     ```
 3. Open R or RStudio, and set the working directory to the app folder:
     ```r
-    setwd("path_to_your_app_directory")
+    setwd("path_to_app_directory")
     ```
 4. Run the Shiny app:
     ```r
-    shiny::runApp()
+    shiny::runApp(appDir = "Sampling_planer_app.R")
     ```
 
 ## Author
