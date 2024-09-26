@@ -2,7 +2,7 @@
 
 ## Overview
 
-This Shiny application allows users to plan and visualize complex temporal sampling schemas or sampling calendars. It supports various sample types, such as plankton, eDNA, and sediment. Additional sample types can be created to accomodate different sampling schemes for the same sample type, for example for high-spatial resolution and low frequency water eDNA and sediment samples. Each sample type has customizable parameters such as sampling zones, frequencies, sampling launching delays, and the number of replicas.
+This Shiny application allows users to plan and visualize complex temporal sampling schemas or sampling calendars. It supports various sample types, such as plankton, eDNA, and sediment. Additional sample types can be created to accommodate different sampling schemes for the same sample type, for example, high-spatial resolution and low-frequency water eDNA and sediment samples. Each sample type has customizable parameters such as sampling zones, frequencies, sampling launching delays, and the number of replicas.
 
 The app provides an interactive interface for users to:
 
@@ -37,11 +37,7 @@ The app provides an interactive interface for users to:
     shiny::runApp()
     ```
 
-## Additional Information
-
-- This app is designed for planning and visualizing ecological sampling schedules but can be adapted for other use cases.
-- Feel free to modify the code to suit your specific needs or contribute to the repository.
-
 ## Author
 
-[Your Name]
+Cristian Correa
+
