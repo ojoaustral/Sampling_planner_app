@@ -1,4 +1,4 @@
-# 
+#
 # The objective of this script is to help plan and visualize the temporal sampling schema or sampling calendar
 #
 
@@ -15,8 +15,8 @@ start_date <- as.Date("2025-01-01")
 end_date   <- as.Date("2025-12-20")
 
 # (Input) Enter sampling zones for each sample type ####
-sampling_zones_plankton  <- c("Z1", "Z2", "Z3", "Z4.1") 
-sampling_zones_eDNA      <- c("Z1", "Z2", "Z3", "Z4.1", "Z4.2", "Z4.3", "Z5")  
+sampling_zones_plankton  <- c("Z1", "Z2", "Z3", "Z4.1")
+sampling_zones_eDNA      <- c("Z1", "Z2", "Z3", "Z4.1", "Z4.2", "Z4.3", "Z5")
 sampling_zones_eDNA2     <- c("Z6...Z26")
 if(sum(sampling_zones_eDNA2 %in% sampling_zones_eDNA)>0) print("Warning! Avoid zone overlaps between eDNA sample types")
 sampling_zones_sediment  <- c("Z1", "Z2", "Z3", "Z5")
@@ -174,8 +174,49 @@ ggplot(sampling_calendar, aes(x = week_ID, y = zone, fill = sampling, group = sa
 df <- sampling_calendar %>% 
   select(!starts_with("sampling_flag")) %>% 
   filter(sampling != "No sampling") %>% 
-  group_by(sampling) %>% tally(wt = ifelse(zone == "Z6...Z26", 20,1)*n_replicas)
+  group_by(sampling) %>%
+  tally(wt = ifelse(zone == "Z6...Z26", 20,1)*n_replicas)
 
 df
 
+# Make interactive leaflet map ####
+
+# Load the leaflet package
+library(leaflet)
+
+all_zone_coords <- as.data.frame(
+  matrix( c("Z1", 32.3414751, -64.6781091,
+            "Z2", 32.3334034, -64.6488207,
+            "Z3", 32.4675049, -64.5808043,
+            "Z4.1", 32.3733700, -64.5480724,
+            "Z4.2", 32.3733700, -64.5480724,
+            "Z4.3", 32.3733700, -64.5480724,
+            "Z5", 32.3744589, -64.7730149),
+            ncol = 3, byrow = T), 
+               stringsAsFactors = F
+            )
+colnames(all_zone_coords) <- c("zone", "Latitude", "Longitude")
+all_zone_coords$Latitude <- as.numeric(all_zone_coords$Latitude)
+all_zone_coords$Longitude <- as.numeric(all_zone_coords$Longitude)
+
+# Calculate the center of all_zone_coords
+center_lat <- mean(all_zone_coords$Latitude)
+center_lng <- mean(all_zone_coords$Longitude)
+
+# Create a leaflet map
+map2 <- leaflet(data = all_zone_coords) %>%
+  addProviderTiles(providers$Esri.WorldImagery) %>%
+  addCircleMarkers(~Longitude, ~Latitude, 
+    #label = ~as.character(zone),
+    radius = 2, color = "red", fill = T, fillOpacity = 1) %>%
+  addLabelOnlyMarkers( ~Longitude, ~Latitude,
+    label = ~zone, #paste(Sample_CODE,Sample_Name),
+    labelOptions = labelOptions(noHide = T,
+      direction = 'top', textOnly = TRUE, style = list(color = "orange") ) ) %>%
+  setView(lng = center_lng, lat = center_lat, zoom = 10)
+
+# Print the map
+map2
+
+install.packages("lintr")
 
