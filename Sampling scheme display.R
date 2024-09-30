@@ -10,6 +10,10 @@ library(ggplot2)
 library(lubridate)
 library(lunar)  # To calculate lunar phases
 
+# Set working directory 
+
+setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
+
 # (Input) Enter study period (start and end dates) ####
 start_date <- as.Date("2025-01-01")
 end_date   <- as.Date("2025-12-20")
@@ -218,5 +222,5 @@ map2 <- leaflet(data = all_zone_coords) %>%
 # Print the map
 map2
 
-install.packages("lintr")
+
 

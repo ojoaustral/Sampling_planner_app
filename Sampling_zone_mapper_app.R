@@ -5,6 +5,9 @@ library("leaflet.extras")
 library(DT)
 library(clipr)
 
+setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
+
+
 # Create the data frame as provided
 all_zone_coords <- as.data.frame(
   matrix( c("Z1", 32.3414751, -64.6781091,
