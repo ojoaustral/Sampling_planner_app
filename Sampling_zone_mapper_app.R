@@ -1,58 +1,50 @@
+# Sampling_zone_mapper_app Shiny app ####
+# Author: Cristian Correa
+# Last modified: 2024-10-07 
+
 # Load necessary packages
 library(shiny)
 library(leaflet)
 library("leaflet.extras")
 library(DT)
 library(clipr)
-
-setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
-
-
-# Create the data frame as provided
-all_zone_coords <- as.data.frame(
-  matrix( c("Z1", 32.3414751, -64.6781091,
-            "Z2", 32.3334034, -64.6488207,
-            "Z3", 32.4675049, -64.5808043,
-            "Z4.1", 32.3733700, -64.5480724,
-            "Z4.2", 32.3733700, -64.5480724,
-            "Z4.3", 32.3733700, -64.5480724,
-            "Z5", 32.3744589, -64.7730149),
-          ncol = 3, byrow = TRUE), 
-  stringsAsFactors = FALSE
-)
-colnames(all_zone_coords) <- c("zone", "Latitude", "Longitude")
-all_zone_coords$Latitude <- as.numeric(all_zone_coords$Latitude)
-all_zone_coords$Longitude <- as.numeric(all_zone_coords$Longitude)
-
-# Calculate the center of all_zone_coords
-center_lat <- mean(all_zone_coords$Latitude)
-center_lng <- mean(all_zone_coords$Longitude)
+library(dplyr)
 
 # Create a Shiny app to handle the leaflet map and coordinate capture
 ui <- fluidPage(
-  titlePanel("Geographical Zone Editor"),
-  sidebarLayout(
-    sidebarPanel(
-      h4("Zone Coordinates Editor"),
-      DTOutput("table"), # Table to display and edit zone coordinates
-      actionButton("delete_mode", "Enable Delete Mode"),  # Remove class argument
-      actionButton("save", "Save Data"),
-      actionButton("copy_clipboard", "Copy to Clipboard"),
-      hr(),
-      textOutput("status"),
-      p("Note: Delete mode must be activated to remove points from the map.")
-    ),
-    mainPanel(
-      leafletOutput("map"),
-      p("Click on the map to add new points. Drag markers to edit locations. Activate delete mode to remove points.")
-    )
+  titlePanel("Sampling  Zone Editor"),
+  mainPanel(
+    p("Select a marker and click on the map to add new sampling zones. Drag markers to edit locations. Enable 'Delete mode' and click to delete zones."),
+    actionButton("delete_mode", "Enable Delete Mode"),  # Remove class argument
+    leafletOutput("map"),
+    br(),
+    h4("Zone Coordinates Editor"),
+    DTOutput("table"), # Table to display and edit zone coordinates
+    actionButton("save", "Save Data"),
+    actionButton("copy_clipboard", "Copy to Clipboard"),
+    hr(),
+    textOutput("status")
   )
 )
 
 server <- function(input, output, session) {
   
+  # Load zone coordinates from CSV
+  zone_coords <- read.csv("zone_coords.csv", stringsAsFactors = FALSE)
+  
+  # Convert Latitude and Longitude to numeric if needed
+  zone_coords$Latitude <- as.numeric(zone_coords$Latitude)
+  zone_coords$Longitude <- as.numeric(zone_coords$Longitude)
+  
+  # Convert all columns starting with "zone_selection" to logical
+  zone_coords <- zone_coords %>%
+    mutate(across(starts_with("zone_selection"), as.logical))
+  
   # Reactive value to store current data and delete mode status
-  zone_data <- reactiveValues(coords = all_zone_coords, delete_mode = FALSE)
+  zone_data <- reactiveValues(coords = zone_coords, delete_mode = FALSE)
+  
+  # Reactive value to store current map view settings
+  map_view <- reactiveValues(lat = NULL, lng = NULL, zoom = NULL)
   
   # Toggle delete mode when the button is clicked
   observeEvent(input$delete_mode, {
@@ -81,7 +73,7 @@ server <- function(input, output, session) {
         markerOptions = drawMarkerOptions(),
         editOptions = editToolbarOptions(selectedPathOptions = selectedPathOptions())
       ) %>%
-      setView(lng = center_lng, lat = center_lat, zoom = 10) %>%
+      setView(lng = mean(zone_data$coords$Longitude, na.rm = TRUE), lat = mean(zone_data$coords$Latitude, na.rm = TRUE), zoom = 10) %>%
       htmlwidgets::onRender("
         function(el, x) {
           var map = this;
@@ -99,28 +91,54 @@ server <- function(input, output, session) {
               });
             }
           });
+          map.on('moveend', function() {
+            Shiny.setInputValue('map_bounds', {
+              lat: map.getCenter().lat,
+              lng: map.getCenter().lng,
+              zoom: map.getZoom()
+            });
+          });
         }
       ")
   })
   
-  # Observe when a new point is drawn
+  # Observe when the map view changes and store the lat/lng/zoom
+  observeEvent(input$map_bounds, {
+    map_view$lat <- input$map_bounds$lat
+    map_view$lng <- input$map_bounds$lng
+    map_view$zoom <- input$map_bounds$zoom
+  })
+  
+  # Observe when a new point is drawn and add it without resetting the map view
   observeEvent(input$map_draw_new_feature, {
     feature <- input$map_draw_new_feature
-    if(feature$geometry$type == "Point") {
+    if (feature$geometry$type == "Point") {
       new_coord <- data.frame(
         zone = paste0("New_", nrow(zone_data$coords) + 1),
         Latitude = feature$geometry$coordinates[[2]],
         Longitude = feature$geometry$coordinates[[1]],
         stringsAsFactors = FALSE
       )
-      zone_data$coords <- rbind(zone_data$coords, new_coord)
       
-      # Update the map with new points
+      # Create a row with default FALSE for all zone_selection_* columns
+      default_values <- as.data.frame(lapply(
+        zone_data$coords %>% select(starts_with("zone_selection")),
+        function(x) FALSE
+      ))
+      
+      # Combine the new coordinates with the default FALSE values for zone_selection columns
+      new_row <- cbind(new_coord, default_values)
+      
+      # Glue the new points to the existing table of points
+      zone_data$coords <- bind_rows(zone_data$coords, new_row)
+      
+      # Update the map without resetting the view
       leafletProxy("map") %>%
-        addMarkers(lng = new_coord$Longitude, lat = new_coord$Latitude, 
+        addMarkers(lng = new_coord$Longitude, lat = new_coord$Latitude,
                    label = new_coord$zone,
-                   layerId = new_coord$zone, 
-                   labelOptions = labelOptions(noHide = TRUE, direction = 'top', textOnly = TRUE, style = list(color = "orange")))
+                   layerId = new_coord$zone,
+                   labelOptions = labelOptions(noHide = TRUE, direction = 'top', textOnly = TRUE, style = list(color = "orange"))) %>%
+        setView(lng = map_view$lng, lat = map_view$lat, zoom = map_view$zoom)
     }
   })
   
@@ -148,9 +166,38 @@ server <- function(input, output, session) {
     }
   })
   
-  # Render table to edit zone names and coordinates
+  # Render table to edit zone names and coordinates, with logical columns as checkboxes
   output$table <- renderDT({
-    datatable(zone_data$coords, editable = TRUE, rownames = FALSE)  # Disable rownames
+    datatable(
+      zone_data$coords,
+      editable = TRUE,  # Make the table editable
+      rownames = FALSE, # Disable rownames
+      selection = 'none', # Disable row selection
+      options = list(
+        pageLength = 50,  # Set default number of rows per page
+        stateSave = TRUE,  # Preserve table state (pagination and search)
+        columnDefs = list(
+          list(
+            targets = grep("zone_selection", names(zone_data$coords)) - 1, # Identify the logical columns
+            render = JS(
+              "function(data, type, row, meta) {",
+              "return '<input type=\"checkbox\"' + (data == true ? ' checked' : '') + ' onclick=\"Shiny.setInputValue(\\'checkbox_change\\', {row: ' + meta.row + ', col: ' + meta.col + ', checked: this.checked})\" />';",
+              "}"
+            )
+          )
+        )
+      )
+    )
+  })
+  
+  # Update the reactive data when checkboxes are clicked
+  observeEvent(input$checkbox_change, {
+    row <- input$checkbox_change$row + 1  # Adjust for zero-indexing
+    col <- input$checkbox_change$col + 1  # Adjust for zero-indexing
+    checked <- input$checkbox_change$checked
+    
+    # Update the reactive data frame
+    zone_data$coords[row, col] <- as.logical(checked)
   })
   
   # Update the coordinates or zone name if edited in the table
@@ -180,3 +227,5 @@ server <- function(input, output, session) {
 
 # Run the shiny app
 shinyApp(ui, server)
+
+

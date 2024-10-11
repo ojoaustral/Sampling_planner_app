@@ -1,5 +1,6 @@
 #
-# The objective of this script is to help plan and visualize the temporal sampling schema or sampling calendar
+# The objective of this script is to help plan and visualize
+# the temporal sampling schema
 #
 
 rm(list = ls())
@@ -9,10 +10,6 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 library(lunar)  # To calculate lunar phases
-
-# Set working directory 
-
-setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
 
 # (Input) Enter study period (start and end dates) ####
 start_date <- as.Date("2025-01-01")
@@ -222,5 +219,90 @@ map2 <- leaflet(data = all_zone_coords) %>%
 # Print the map
 map2
 
+##############################################
 
+# Load necessary packages
+library(leaflet)
+library("leaflet.extras")
+library(shiny)
+
+# Create the data frame as provided
+all_zone_coords <- as.data.frame(
+  matrix( c("Z1", 32.3414751, -64.6781091,
+            "Z2", 32.3334034, -64.6488207,
+            "Z3", 32.4675049, -64.5808043,
+            "Z4.1", 32.3733700, -64.5480724,
+            "Z4.2", 32.3733700, -64.5480724,
+            "Z4.3", 32.3733700, -64.5480724,
+            "Z5", 32.3744589, -64.7730149),
+            ncol = 3, byrow = TRUE), 
+               stringsAsFactors = FALSE
+            )
+colnames(all_zone_coords) <- c("zone", "Latitude", "Longitude")
+all_zone_coords$Latitude <- as.numeric(all_zone_coords$Latitude)
+all_zone_coords$Longitude <- as.numeric(all_zone_coords$Longitude)
+
+# Calculate the center of all_zone_coords
+center_lat <- mean(all_zone_coords$Latitude)
+center_lng <- mean(all_zone_coords$Longitude)
+
+# Create a Shiny app to handle the leaflet map and coordinate capture
+ui <- fluidPage(
+  leafletOutput("map"),
+  tableOutput("click_table")
+)
+
+server <- function(input, output, session) {
+  
+  # Reactive value to store click data
+  click_data <- reactiveValues(coords = data.frame(zone = character(),
+                                                   Latitude = numeric(),
+                                                   Longitude = numeric(),
+                                                   stringsAsFactors = FALSE))
+  
+  # Render the leaflet map
+  output$map <- renderLeaflet({
+    leaflet(data = all_zone_coords) %>%
+      addProviderTiles(providers$Esri.WorldImagery) %>%
+      addCircleMarkers(~Longitude, ~Latitude, 
+                       radius = 2, color = "red", fill = TRUE, fillOpacity = 1) %>%
+      addLabelOnlyMarkers(~Longitude, ~Latitude,
+                          label = ~zone,
+                          labelOptions = labelOptions(noHide = TRUE,
+                                                      direction = 'top', textOnly = TRUE,
+                                                      style = list(color = "orange"))) %>%
+      addDrawToolbar(
+        targetGroup = 'clicks',
+        polylineOptions = FALSE,
+        polygonOptions = FALSE,
+        circleOptions = FALSE,
+        rectangleOptions = FALSE,
+        markerOptions = drawMarkerOptions(),
+        editOptions = editToolbarOptions(selectedPathOptions = selectedPathOptions())
+      ) %>%
+      setView(lng = center_lng, lat = center_lat, zoom = 10)
+  })
+  
+  # Capture click events and update dataframe
+  observeEvent(input$map_draw_new_feature, {
+    feature <- input$map_draw_new_feature
+    if(feature$geometry$type == "Point") {
+      new_coord <- data.frame(
+        zone = paste0("New_", nrow(click_data$coords) + 1),
+        Latitude = feature$geometry$coordinates[[2]],
+        Longitude = feature$geometry$coordinates[[1]],
+        stringsAsFactors = FALSE
+      )
+      click_data$coords <- rbind(click_data$coords, new_coord)
+    }
+  })
+  
+  # Display the updated dataframe
+  output$click_table <- renderTable({
+    click_data$coords
+  })
+}
+
+# Run the shiny app
+shinyApp(ui, server)
 

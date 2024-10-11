@@ -1,4 +1,4 @@
-# Sampling_planer_app: Sampling Calendar Visualization App
+# Sampling_planner_app: Interactively define sampling zones, assign sample types and schedule long, multi-frequency time series
 
 ## Overview
 
@@ -21,18 +21,26 @@ The app provides an interactive interface for users to:
 ## How to Run the App
 
 1. Ensure you have the required R packages installed:
+
     ```r
-    install.packages(c("shiny", "dplyr", "ggplot2", "lubridate", "lunar"))
+    install.packages(c("shiny", "dplyr", "ggplot2", "lubridate", "lunar", "leaflet", "leaflet.extras", "DT", "clipr"))
     ```
+
 2. Clone this repository:
+
     ```bash
-    git clone https://github.com/ojoaustral/Sampling_planer_app.git
+    git clone https://github.com/ojoaustral/Sampling_planner_app.git
     ```
+
 3. Open R or RStudio, and set the working directory to the app folder:
+
     ```r
     setwd("path_to_app_directory")
     ```
-4. Run the Shiny app:
+4. Make sure you have in the working directory the 'zone_coords.csv' file which can store default zone and sample allocation values to begin with. During a session with the app these values can be deleted/edited to suit you needs, and new values will be remembered in tis file so long changes are seved.
+   
+5. Run the Shiny app:
+
     ```r
     shiny::runApp(appDir = "Sampling_planer_app.R")
     ```
@@ -40,4 +48,3 @@ The app provides an interactive interface for users to:
 ## Author
 
 Cristian Correa
-

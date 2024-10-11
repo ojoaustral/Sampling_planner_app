@@ -6,7 +6,7 @@ library(lunar)
 library(rlang)
 
 
-# Define the UI with scrolling sidebar for inputs
+# Define the UI with scrolling sidebar for inputs ####
 ui <- fluidPage(
   tags$head(
     # CSS for making the sidebar scrollable
@@ -39,6 +39,9 @@ ui <- fluidPage(
           uiOutput("zone_selection_sediment"),
           uiOutput("zone_selection_sediment2"),
           
+          # Number of zones in Other zones 
+          numericInput("n_otherzones", "Number of zones under the Other_zones umbrella:", value = 20, min = 1, max = 1000),
+          
           # Number of replicas input
           numericInput("nrep_plankton", "Number of Replicas for Plankton:", value = 3, min = 1, max = 10),
           numericInput("nrep_eDNA", "Number of Replicas for eDNA:", value = 3, min = 1, max = 10),
@@ -69,10 +72,10 @@ ui <- fluidPage(
   )
 )
 
-# Define the server logic
+# Define the server logic ####
 server <- function(input, output, session) {
   
-  # Load the zones from the CSV file
+  # Load pre-defined zones from a CSV file ####
   zones_data <- reactive({
     # Ensure the file exists and load the data correctly
     req(file.exists("zone_coords.csv"))  # Ensure the file exists
@@ -92,7 +95,7 @@ server <- function(input, output, session) {
     unlist(strsplit(input$all_zones, ","))
   })
   
-  # Create generalized pre-selected sampling type zone selection
+  # Create reactive function to extract pre-selected zones given sample types
   preselected_reactive <- function(zone_selection = "zone_selection_plankton") {
     reactive({
       zones_data() %>%
@@ -102,7 +105,7 @@ server <- function(input, output, session) {
     })
   }
   
-  # Generate UI for each sampling type zone selection
+  # Generate UI selection checkboxs for each sampling type ####
   output$zone_selection_plankton <- renderUI({
     checkboxGroupInput(
       "zones_plankton", 
@@ -111,9 +114,6 @@ server <- function(input, output, session) {
       selected = preselected_reactive("zone_selection_plankton")()  # Call the reactive function and evaluate it
     )
   })
-  
-  ########################
-  
   
   output$zone_selection_eDNA <- renderUI({
     checkboxGroupInput(
@@ -152,7 +152,7 @@ server <- function(input, output, session) {
   })
   
   
-  ###################################################################
+  # Reactive function to create the sampling calendar ####
   
   sampling_calendar_reactive <- reactive({
     
@@ -207,7 +207,8 @@ server <- function(input, output, session) {
         left_join(weekly_schema, by = "week_ID") %>%
         mutate(sampling = ifelse(sampling_flag_plankton, "Plankton", "No sampling"),
                n_replicas = ifelse(sampling_flag_plankton, input$nrep_plankton, 0))
-      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_plankton %>% mutate(sampling_calendar = "Plankton")
+      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_plankton %>%
+        mutate(sampling_calendar = "Plankton")
     }
     
     if (!is.null(sampling_zones_eDNA) && length(sampling_zones_eDNA) > 0) {
@@ -215,7 +216,8 @@ server <- function(input, output, session) {
         left_join(weekly_schema, by = "week_ID") %>%
         mutate(sampling = ifelse(sampling_flag_eDNA, "eDNA", "No sampling"),
                n_replicas = ifelse(sampling_flag_eDNA, input$nrep_eDNA, 0))
-      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_eDNA %>% mutate(sampling_calendar = "eDNA")
+      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_eDNA %>%
+        mutate(sampling_calendar = "eDNA")
     }
     
     if (!is.null(sampling_zones_eDNA2) && length(sampling_zones_eDNA2) > 0) {
@@ -223,7 +225,8 @@ server <- function(input, output, session) {
         left_join(weekly_schema, by = "week_ID") %>%
         mutate(sampling = ifelse(sampling_flag_eDNA2, "eDNA", "No sampling"),
                n_replicas = ifelse(sampling_flag_eDNA2, input$nrep_eDNA2, 0))
-      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_eDNA2 %>% mutate(sampling_calendar = "eDNA")
+      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_eDNA2 %>%
+        mutate(sampling_calendar = "eDNA")
     }
     
     if (!is.null(sampling_zones_sediment) && length(sampling_zones_sediment) > 0) {
@@ -231,7 +234,8 @@ server <- function(input, output, session) {
         left_join(weekly_schema, by = "week_ID") %>%
         mutate(sampling = ifelse(sampling_flag_sediment, "Sediment", "No sampling"),
                n_replicas = ifelse(sampling_flag_sediment, input$nrep_sediment, 0))
-      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_sediment %>% mutate(sampling_calendar = "Sediment")
+      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_sediment %>%
+        mutate(sampling_calendar = "Sediment")
     }
     
     if (!is.null(sampling_zones_sediment2) && length(sampling_zones_sediment2) > 0) {
@@ -239,7 +243,8 @@ server <- function(input, output, session) {
         left_join(weekly_schema, by = "week_ID") %>%
         mutate(sampling = ifelse(sampling_flag_sediment2, "Sediment", "No sampling"),
                n_replicas = ifelse(sampling_flag_sediment2, input$nrep_sediment2, 0))
-      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_sediment2 %>% mutate(sampling_calendar = "Sediment")
+      sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_sediment2 %>%
+        mutate(sampling_calendar = "Sediment")
     }
     
     # Combine into one comprehensive calendar, only bind rows if data frames are non-NULL
@@ -255,10 +260,11 @@ server <- function(input, output, session) {
     return(sampling_calendar)
   })
   
-  
+  # Render the calendar plot ####
   output$samplingPlot <- renderPlot({
     sampling_calendar <- sampling_calendar_reactive()
     
+    # Make sure sampling_calendar is ready before moving on to avoid errors.
     if (is.null(sampling_calendar) || nrow(sampling_calendar) == 0) {
       return(NULL)  # Return nothing if no sampling calendar is available
     } 
@@ -294,6 +300,7 @@ server <- function(input, output, session) {
       theme(axis.text.x = element_text(angle = 90, hjust = 1))
   })
   
+  # Render table with sample totals ####
   output$samplingTable <- renderTable({
     sampling_calendar <- sampling_calendar_reactive()
     
@@ -305,13 +312,13 @@ server <- function(input, output, session) {
       select(!starts_with("sampling_flag")) %>%
       filter(sampling != "No sampling") %>%
       group_by(sampling) %>%
-      tally(wt = ifelse(zone == "Z6...Z26", 20, 1) * n_replicas)
+      tally(wt = ifelse(zone == "Other zones", input$n_otherzones, 1) * n_replicas)
     
     df
   })
 }
 
-# Run the application 
+# Run the application ####
 shinyApp(ui = ui, server = server)
 
 
