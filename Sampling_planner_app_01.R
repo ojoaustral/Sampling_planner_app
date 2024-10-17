@@ -1,5 +1,4 @@
 # Load necessary packages
-
 library(shiny)
 library(leaflet)
 library(leaflet.extras)
@@ -9,10 +8,13 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 library(lunar)
+library(tidyverse)
+library(kableExtra)
+
+
 
 # Set working directory 
 setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
-
 
 # Define the UI with two tabs: Zone Mapper and Sampling Planner ####
 ui <- navbarPage("Sampling Planner",
@@ -24,7 +26,7 @@ ui <- navbarPage("Sampling Planner",
                             mainPanel(
                               p("Select a marker and click on the map to add new sampling zones. Drag markers to edit locations. Enable 'Delete mode' and click to delete zones."),
                               actionButton("delete_mode", "Enable Delete Mode"),  
-                              leafletOutput("map"),
+                              leafletOutput("map", height = "500px", width = "900px"),
                               br(),
                               h4("Zone Coordinates Editor"),
                               DTOutput("table"),  # Table to display and edit zone coordinates
@@ -39,61 +41,45 @@ ui <- navbarPage("Sampling Planner",
                  # Tab 2: Sampling scheme
                  tabPanel("Sampling scheme",
                           fluidPage(
-                            titlePanel("Sampling Calendar Visualization"),
+                            # titlePanel("Sampling Scheme Editor"),
                             sidebarLayout(
                               sidebarPanel(
-                                div(class = "scrollable-sidebar",  # Apply scrolling class to the sidebar panel
-                                    style = "max-height: 600px; overflow-y: auto;",  # Added for scrolling
+                                div(#class = "scrollable-sidebar",  # Apply scrolling class to the sidebar panel
+                                    style = "max-height: 700px; overflow-y: auto;",  # Added for scrolling
+                                    h4("INPUT PARAMETERS"),
                                     br(),
-                                    br(),
-                                    dateInput("start_date", "Start Date:", value = "2025-01-01"),
-                                    dateInput("end_date", "End Date:", value = "2025-12-20"),
+                                    dateInput("start_date", "Start Date:", value = "2025-01-06"),
+                                    dateInput("end_date", "End Date:", value = "2025-12-31"),
                                     # Choose backbone week type for calendar
                                     radioButtons("calendar_type", "Select Calendar Type:",
                                                  choices = list("Gregorian" = "gregorian", "Lunar" = "lunar"),
                                                  selected = "gregorian"),
                                     # Number of zones in Other zones 
-                                    numericInput("n_otherzones", "Number of zones under the Other_zones umbrella:", value = 20, min = 1, max = 1000),
-                                    
-                                    # Number of replicas input
-                                    numericInput("nrep_plankton", "Number of Replicas for Plankton:", value = 3, min = 1, max = 10),
-                                    numericInput("nrep_eDNA", "Number of Replicas for eDNA:", value = 3, min = 1, max = 10),
-                                    numericInput("nrep_eDNA2", "Number of Replicas for eDNA2:", value = 1, min = 1, max = 10),
-                                    numericInput("nrep_sediment", "Number of Replicas for Sediment:", value = 3, min = 1, max = 10),
-                                    numericInput("nrep_sediment2", "Number of Replicas for Sediment2:", value = 1, min = 1, max = 10),
-                                    
-                                    # Sampling frequencies input
-                                    # textInput("freq_plankton", "Frequency for Plankton:", value = "2 weeks"),
-                                    # textInput("freq_eDNA", "Frequency for eDNA:", value = "13 weeks"),
-                                    # textInput("freq_eDNA2", "Frequency for eDNA2:", value = "52 weeks"),
-                                    # textInput("freq_sediment", "Frequency for Sediment:", value = "26 weeks"),
-                                    # textInput("freq_sediment2", "Frequency for Sediment2:", value = "52 weeks"),
-                                    
-                                    # Delays input
-                                    numericInput("freq_plankton", "Frequency for Plankton (weeks):", value = 2, min = 0),
-                                    numericInput("freq_eDNA", "Frequency for eDNA (weeks):", value = 13, min = 0),
-                                    numericInput("freq_eDNA2", "Frequency for eDNA2 (weeks):", value = 52, min = 0),
-                                    numericInput("freq_sediment", "Frequency for Sediment (weeks):", value = 26, min = 0),
-                                    numericInput("freq_sediment2", "Frequency for Sediment2 (weeks):", value = 52, min = 0),
-                                    
-                                    # Delays input
-                                    numericInput("delay_plankton", "Delay for Plankton (weeks):", value = 0, min = 0),
-                                    numericInput("delay_eDNA", "Delay for eDNA (weeks):", value = 4, min = 0),
-                                    numericInput("delay_eDNA2", "Delay for eDNA2 (weeks):", value = 17, min = 0),
-                                    numericInput("delay_sediment", "Delay for Sediment (weeks):", value = 17, min = 0),
-                                    numericInput("delay_sediment2", "Delay for Sediment2 (weeks):", value = 17, min = 0),
-                                    
-                                    # Add Save and Copy buttons to the sidebar
-                                    actionButton("save_calendar", "Save Calendar Data"),
-                                    actionButton("copy_calendar", "Copy Calendar to Clipboard")
-                                )
+                                    numericInput("n_otherzones", "Number of zones under the Other_zones umbrella:", value = 20, min = 0, max = 100),
+                                    h4("Additional parameters per sample type"),
+                                    DTOutput("sampling_params_table"),
+                                    actionButton("save_params", "Save Parameters"),
+                                    actionButton("copy_params", "Copy to Clipboard"),
+                                    textOutput("status_params"),
+                                    hr(),
+                                    br()
+                                    )
                               ),
                               
                               mainPanel(
+                                h4("Sampling schedule"),
                                 plotOutput("samplingPlot"),
+                                # br(),
+                                h4("Monthly and total sample output"),
                                 tableOutput("samplingTable"),
+                                # br(),
                                 hr(),
-                                textOutput("status_calendar")  # Added for status messages
+                                # Add Save and Copy buttons to the sidebar
+                                actionButton("save_calendar", "Save Calendar Data"),
+                                actionButton("copy_calendar", "Copy Calendar to Clipboard"),
+                                textOutput("status_calendar"),  # Added for status messages
+                                br(),
+                                br()
                               )
                             )
                           )
@@ -117,16 +103,16 @@ server <- function(input, output, session) {
   # Reactive value to store current data and delete mode status
   zone_data <- reactiveValues(coords = zone_coords, delete_mode = FALSE)
   
-  # Reactive value to store current map view settings (HERE, set some value based on mean(zone_coords$Latitude) and mean(zone_coords$Longitude)
+  # Reactive value to store current map view settings
   map_view <- reactiveValues(lat = NULL, lng = NULL, zoom = NULL)
   
   # Toggle delete mode when the button is clicked
   observeEvent(input$delete_mode, {
     zone_data$delete_mode <- !zone_data$delete_mode
     if (zone_data$delete_mode) {
-      updateActionButton(session, "delete_mode", label = "Disable Delete Mode")  # Update only label
+      updateActionButton(session, "delete_mode", label = "Disable Delete Mode")  
     } else {
-      updateActionButton(session, "delete_mode", label = "Enable Delete Mode")   # Update only label
+      updateActionButton(session, "delete_mode", label = "Enable Delete Mode")  
     }
   })
   
@@ -145,8 +131,8 @@ server <- function(input, output, session) {
         circleOptions = FALSE,
         rectangleOptions = FALSE,
         markerOptions = drawMarkerOptions(),
-        edittoolbar = FALSE,
-        ) %>%
+        edittoolbar = FALSE
+      ) %>%
       setView(lng = mean(zone_data$coords$Longitude, na.rm = TRUE), 
               lat = mean(zone_data$coords$Latitude, na.rm = TRUE), 
               zoom = 10) %>%
@@ -155,7 +141,7 @@ server <- function(input, output, session) {
           var map = this;
           map.eachLayer(function(layer) {
             if (layer.options.layerId) {
-              layer.dragging.enable(); // Make the marker draggable
+              layer.dragging.enable(); 
               layer.on('dragend', function(e) {
                 var marker = e.target;
                 var position = marker.getLatLng();
@@ -246,8 +232,8 @@ server <- function(input, output, session) {
   output$table <- renderDT({
     datatable(
       zone_data$coords,
-      editable = TRUE,  # Make the table editable
-      rownames = FALSE, # Disable rownames
+      editable = TRUE,  
+      rownames = FALSE, 
       colnames= c("Zone" = 1,
                   "Latitude" = 2,	
                   "Longitude" = 3,
@@ -257,13 +243,13 @@ server <- function(input, output, session) {
                   "Sediment  (schedule_1)" = 7,
                   "Sediment  (schedule_2)" = 8,
                   "Comments" = 9),
-      selection = 'none', # Disable row selection
+      selection = 'none', 
       options = list(
-        pageLength = 50,  # Set default number of rows per page
-        stateSave = TRUE,  # Preserve table state (pagination and search)
+        pageLength = 50,  
+        stateSave = TRUE,  
         columnDefs = list(
           list(
-            targets = grep("zone_selection", names(zone_data$coords)) - 1, # Identify the logical columns
+            targets = grep("zone_selection", names(zone_data$coords)) - 1, 
             render = JS(
               "function(data, type, row, meta) {",
               "return '<input type=\"checkbox\"' + (data == true ? ' checked' : '') + ' onclick=\"Shiny.setInputValue(\\'checkbox_change\\', {row: ' + meta.row + ', col: ' + meta.col + ', checked: this.checked})\" />';",
@@ -273,14 +259,13 @@ server <- function(input, output, session) {
         )
       )
     ) %>%
-      # Reduce the decimal places of Latitude and Longitude columns to 4
       formatRound(columns = c('Latitude', 'Longitude'), digits = 4)
   })
   
   # Update the reactive data when checkboxes are clicked
   observeEvent(input$checkbox_change, {
-    row <- input$checkbox_change$row + 1  # Adjust for zero-indexing
-    col <- input$checkbox_change$col + 1  # Adjust for zero-indexing
+    row <- input$checkbox_change$row + 1  
+    col <- input$checkbox_change$col + 1  
     checked <- input$checkbox_change$checked
     
     # Update the reactive data frame
@@ -291,11 +276,9 @@ server <- function(input, output, session) {
   observeEvent(input$table_cell_edit, {
     info <- input$table_cell_edit
     
-    # No need to adjust indices because we have disabled row names
     edited_row <- info$row
     edited_col <- info$col + 1
     
-    # Update the reactive data frame with the new value
     zone_data$coords[edited_row, edited_col] <- info$value
   })
   
@@ -311,12 +294,49 @@ server <- function(input, output, session) {
     output$status <- renderText({"Data copied to clipboard"})
   })  
   
+  # Sample types and their default values for parameters ####
+  # sample_types <- data.frame(
+  #   Sample_Type = c("Plankton", "eDNA", "eDNA2", "Sediment", "Sediment2"),
+  #   nrep = c(3, 3, 1, 3, 1),
+  #   freq = c(2, 13, 52, 26, 52),
+  #   delay = c(0, 4, 17, 17, 17),
+  #   stringsAsFactors = FALSE
+  # )
+  
+  sample_types <- read.csv("Sampling_params.csv", stringsAsFactors = FALSE) 
+  
+  
+  # Reactive value to store the sampling parameters table
+  sampling_params <- reactiveVal(sample_types)
+  
+  # Render the editable table for sampling parameters
+  output$sampling_params_table <- renderDT({
+    datatable(
+      sampling_params(),
+      editable = TRUE,
+      rownames = FALSE,
+      colnames = c("Sample type", "Technical replicates", "Frequency (weeks)", "Delay (weeks)"),
+      selection = "none",
+      options = list(pageLength = 5, dom = 't')
+    )
+  })
+  
+  # Update the sampling parameters when the table is edited
+  observeEvent(input$sampling_params_table_cell_edit, {
+    info <- input$sampling_params_table_cell_edit
+    new_data <- sampling_params()
+    new_data[info$row, info$col + 1] <- info$value
+    sampling_params(new_data)
+  })
+  
   # Sampling calendar: based on the zone data from the zone_mapper_app ####
   zones_data <- reactive(zone_data$coords)
   
-  
-  
-  
+  # Helper function to get values from the sampling parameters table ####
+  get_param_value <- function(sample_type, param) {
+    params <- sampling_params()
+    return(params[params$Sample_Type == sample_type, param])
+  }
   
   # Reactive function to create the sampling calendar ####
   sampling_calendar_reactive <- reactive({
@@ -350,7 +370,6 @@ server <- function(input, output, session) {
       phase_dates <- all_dates[c(1, phase_transitions)]
       phase_names <- moon_phases[c(1, phase_transitions)]
       
-      
       calendar_backbone <- data.frame(
         period_ID = seq_along(phase_dates),
         period_start_date = phase_dates,
@@ -358,48 +377,30 @@ server <- function(input, output, session) {
       )
     }
     
-    # calendar_backbone
-    
     # Helper function to sample dates from the backbone
     sample_dates_from_backbone <- function(backbone, delay, frequency) {
-      start_period <- backbone$period_start_date[1+delay]
+      start_period <- backbone$period_start_date[1 + delay]
       available_dates <- backbone$period_start_date[backbone$period_start_date >= start_period]
       sampled_periods <- available_dates[seq(1, length(available_dates), by = frequency)]
       return(backbone %>% filter(period_start_date %in% sampled_periods))
     }
     
-    
     # Calculate sampling dates based on the calendar backbone
     sampled_plankton <- sample_dates_from_backbone(
-      calendar_backbone, delay = (input$delay_plankton), frequency = input$freq_plankton
-    ) 
-    if (nrow(sampled_plankton) == 0) warning("No plankton samples found.")
-    
+      calendar_backbone, delay = get_param_value("Plankton", "delay"), frequency = get_param_value("Plankton", "freq")
+    )
     sampled_eDNA <- sample_dates_from_backbone(
-      calendar_backbone, delay = (input$delay_eDNA), frequency = input$freq_eDNA
+      calendar_backbone, delay = get_param_value("eDNA", "delay"), frequency = get_param_value("eDNA", "freq")
     )
-    if (nrow(sampled_eDNA) == 0) warning("No eDNA samples found.")
-    
     sampled_eDNA2 <- sample_dates_from_backbone(
-      calendar_backbone, delay = (input$delay_eDNA2), frequency = input$freq_eDNA2
+      calendar_backbone, delay = get_param_value("eDNA2", "delay"), frequency = get_param_value("eDNA2", "freq")
     )
-    if (nrow(sampled_eDNA2) == 0) warning("No eDNA2 samples found.")
-    
     sampled_sediment <- sample_dates_from_backbone(
-      calendar_backbone, delay = (input$delay_sediment), frequency = input$freq_sediment
+      calendar_backbone, delay = get_param_value("Sediment", "delay"), frequency = get_param_value("Sediment", "freq")
     )
-    if (nrow(sampled_sediment) == 0) warning("No sediment samples found.")
-    
     sampled_sediment2 <- sample_dates_from_backbone(
-      calendar_backbone, delay = (input$delay_sediment2), frequency = input$freq_sediment2
+      calendar_backbone, delay = get_param_value("Sediment2", "delay"), frequency = get_param_value("Sediment2", "freq")
     )
-    if (nrow(sampled_sediment2) == 0) warning("No sediment2 samples found.")
-    
-    
-   
-    # print(sampled_eDNA2)
-    # print(sampled_sediment)
-    
     
     # Add sampling flags to the calendar backbone
     calendar_backbone <- calendar_backbone %>%
@@ -410,9 +411,6 @@ server <- function(input, output, session) {
         sampling_flag_sediment   = period_start_date %in% sampled_sediment$period_start_date,
         sampling_flag_sediment2  = period_start_date %in% sampled_sediment2$period_start_date
       )
-     # print(calendar_backbone)
-    
-    
     
     # Create a list to store each sampling calendar
     sampling_calendars <- list()
@@ -423,7 +421,7 @@ server <- function(input, output, session) {
                                                 zone = sampling_zones_plankton) %>%
         left_join(calendar_backbone, by = "period_ID") %>%
         mutate(sampling = ifelse(sampling_flag_plankton, "Plankton", "No sampling"),
-               n_replicas = ifelse(sampling_flag_plankton, input$nrep_plankton, 0))
+               n_replicas = ifelse(sampling_flag_plankton, get_param_value("Plankton", "nrep"), 0))
       sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_plankton %>%
         mutate(sampling_type = "Plankton")
     }
@@ -433,66 +431,61 @@ server <- function(input, output, session) {
                                             zone = sampling_zones_eDNA) %>%
         left_join(calendar_backbone, by = "period_ID") %>%
         mutate(sampling = ifelse(sampling_flag_eDNA, "eDNA", "No sampling"),
-               n_replicas = ifelse(sampling_flag_eDNA, input$nrep_eDNA, 0))
+               n_replicas = ifelse(sampling_flag_eDNA, get_param_value("eDNA", "nrep"), 0))
       sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_eDNA %>%
         mutate(sampling_type = "eDNA")
     }
     
     if (length(sampling_zones_eDNA2) > 0) {
       sampling_calendar_eDNA2 <- expand.grid(period_ID = calendar_backbone$period_ID,
-                                            zone = sampling_zones_eDNA2) %>%
+                                             zone = sampling_zones_eDNA2) %>%
         left_join(calendar_backbone, by = "period_ID") %>%
         mutate(sampling = ifelse(sampling_flag_eDNA2, "eDNA", "No sampling"),
-               n_replicas = ifelse(sampling_flag_eDNA2, input$nrep_eDNA, 0))
+               n_replicas = ifelse(sampling_flag_eDNA2, get_param_value("eDNA", "nrep"), 0))
       sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_eDNA2 %>%
         mutate(sampling_type = "eDNA")
     }
+    
     if (length(sampling_zones_sediment) > 0) {
       sampling_calendar_sediment <- expand.grid(period_ID = calendar_backbone$period_ID,
-                                            zone = sampling_zones_sediment) %>%
+                                                zone = sampling_zones_sediment) %>%
         left_join(calendar_backbone, by = "period_ID") %>%
         mutate(sampling = ifelse(sampling_flag_sediment, "Sediment", "No sampling"),
-               n_replicas = ifelse(sampling_flag_sediment, input$nrep_sediment, 0))
+               n_replicas = ifelse(sampling_flag_sediment, get_param_value("Sediment", "nrep"), 0))
       sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_sediment %>%
         mutate(sampling_type = "Sediment")
     }
+    
     if (length(sampling_zones_sediment2) > 0) {
       sampling_calendar_sediment2 <- expand.grid(period_ID = calendar_backbone$period_ID,
-                                            zone = sampling_zones_sediment2) %>%
+                                                 zone = sampling_zones_sediment2) %>%
         left_join(calendar_backbone, by = "period_ID") %>%
         mutate(sampling = ifelse(sampling_flag_sediment2, "Sediment", "No sampling"),
-               n_replicas = ifelse(sampling_flag_sediment2, input$nrep_sediment2, 0))
+               n_replicas = ifelse(sampling_flag_sediment2, get_param_value("Sediment2", "nrep"), 0))
       sampling_calendars[[length(sampling_calendars) + 1]] <- sampling_calendar_sediment2 %>%
         mutate(sampling_type = "Sediment")
     }
     
-    # Add other sample types similarly...
-    sampling_calendars
-    
-    
-    # Combine into one comprehensive calendar, only bind rows if data frames are non-NULL
+    # Combine into one comprehensive calendar
     if (length(sampling_calendars) > 0) {
       sampling_calendar <- bind_rows(sampling_calendars) %>%
         mutate(zone = factor(zone, levels = rev(unique(zone))),
                sampling_type = factor(sampling_type, levels = c("Plankton", "eDNA", "Sediment")),
                sampling = factor(sampling, levels = c("No sampling", "Plankton", "eDNA", "Sediment")))
     } else {
-      sampling_calendar <- NULL  # Return NULL if no sampling data is available
+      sampling_calendar <- NULL  
     }
     
     return(sampling_calendar)
     
   })
   
-  
-  
   # Render the calendar plot ####
   output$samplingPlot <- renderPlot({
     sampling_calendar <- sampling_calendar_reactive()
     
-    # Make sure sampling_calendar is ready before moving on to avoid errors.
     if (is.null(sampling_calendar) || nrow(sampling_calendar) == 0) {
-      return(NULL)  # Return nothing if no sampling calendar is available
+      return(NULL)  
     } 
     
     date_labels <- sampling_calendar %>%
@@ -508,17 +501,19 @@ server <- function(input, output, session) {
         moon_phase == "Waning" ~ "🌗",
         TRUE ~ ""))
     
-    ggplot(sampling_calendar, aes(x = period_ID, y = zone, fill = sampling)) + # , group = sampling_calendar
+    ggplot(sampling_calendar, aes(x = period_ID, y = zone, fill = sampling)) + 
       geom_tile(aes(width = 0.8), color = "white", position = position_dodge(width = 0.9), alpha = 0.5) +
       scale_fill_manual(name = "Sample type", values = c(
         "No sampling" = "gray90",
         "Plankton" = "darkgreen",
         "eDNA" = "blue",
-        "Sediment" = "brown"
+        "eDNA2" = "purple",
+        "Sediment" = "brown",
+        "Sediment2" = "orange"
       )) +
       annotate("text", x = moon_phase_labels$period_ID, y = -0.5, label = moon_phase_labels$moon_phase_symbol, size = 3, vjust = -0.5) +
       labs(
-        title = "Sampling Calendar", 
+        # title = "Sampling Calendar", 
         x = if (input$calendar_type == "gregorian") "Week Number" else "Lunar Phase Period", 
         y = "Sampling Zones"
       ) +
@@ -530,21 +525,96 @@ server <- function(input, output, session) {
       theme(axis.text.x = element_text(angle = 90, hjust = 1))
   })
   
-  # Render table with sample totals ####
-  output$samplingTable <- renderTable({
+  # # Render table with sample totals ####
+  # output$samplingTable <- renderTable({
+  #   sampling_calendar <- sampling_calendar_reactive()
+  # 
+  #   if (is.null(sampling_calendar) || nrow(sampling_calendar) == 0) {
+  #     return(NULL)
+  #   }
+  # 
+  #   df <- sampling_calendar %>%
+  #     mutate(month = month(period_start_date, label = TRUE)) %>%
+  #     select(!starts_with("sampling_flag")) %>%
+  #     filter(sampling != "No sampling") %>%
+  #     group_by(sampling, month) %>%
+  #     tally(wt = as.integer(ifelse(zone == "Other zones", n_otherzones, 1) * n_replicas)) %>%
+  #     pivot_wider(names_from = month, values_from = n, values_fill = list(n = 0)) %>%
+  #     ungroup() %>%
+  #     bind_rows(
+  #       summarise(., sampling = "Total", across(where(is.numeric), sum, na.rm = TRUE))) %>%
+  #     rowwise() %>% mutate(Total = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+  #     ungroup()
+  # 
+  #   return(df)
+  # })
+
+  output$samplingTable <- renderUI({
     sampling_calendar <- sampling_calendar_reactive()
     
     if (is.null(sampling_calendar) || nrow(sampling_calendar) == 0) {
-      return(NULL)  # Return nothing if no sampling calendar is available
-    } 
+      return(NULL)
+    }
     
+    # Prepare the dataframe with row and column totals
     df <- sampling_calendar %>%
+      mutate(month = month(period_start_date, label = TRUE)) %>%
       select(!starts_with("sampling_flag")) %>%
       filter(sampling != "No sampling") %>%
-      group_by(sampling) %>%
-      tally(wt = as.integer(ifelse(zone == "Other zones", input$n_otherzones, 1) * n_replicas))
+      group_by(sampling, month) %>%
+      tally(wt = as.integer(ifelse(zone == "Other zones", input$n_otherzones, 1) * n_replicas)) %>%
+      pivot_wider(names_from = month, values_from = n, values_fill = list(n = 0)) %>%
+      ungroup() %>%
+      bind_rows(
+        summarise(., sampling = "Total", across(where(is.numeric), sum, na.rm = TRUE))
+      ) %>%
+      rowwise() %>%
+      mutate(Total = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+      ungroup()
     
-    return(df)
+    # Render the table using kableExtra with highlighted rows and columns
+    df %>%
+      knitr::kable("html", escape = FALSE) %>%
+      kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+      # Highlight the totals row (last row)
+      row_spec(nrow(df), bold = TRUE, background = "#f5f5f5", color ="brown") %>%
+      # Highlight the totals column (last column)
+      column_spec(ncol(df), bold = TRUE, background = "#f5f5f5", color ="brown") %>%
+      # Scrollable table for large data
+      # scroll_box(width = "100%", height = "400px") %>%
+      HTML()
+  })
+  
+  # Save the sampling_params_table to a CSV file
+  observeEvent(input$save_params, {
+    sampling_params <- sampling_params()  # Assuming you have sampling_params stored reactively
+    
+    if (!is.null(sampling_params)) {
+      # Create a timestamp for the filename
+      timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M")
+      filename <- paste0("Sampling_params_", timestamp, ".csv")
+      
+      # Save the sampling parameters table to a CSV file
+      write.csv(sampling_params, filename, row.names = FALSE)
+      
+      # Update status message
+      output$status_params <- renderText({paste("Data saved to", filename)})
+    } else {
+      output$status_params <- renderText({"No data to save."})
+    }
+  })
+  
+  # Copy the sampling_params_table to the clipboard
+  observeEvent(input$copy_params, {
+    sampling_params <- sampling_params()  # Assuming you have sampling_params stored reactively
+    
+    if (!is.null(sampling_params)) {
+      # Copy the sampling parameters to the clipboard
+      write_clip(sampling_params)
+      output$status_params <- renderText({"Data copied to clipboard"})
+    } else {
+      output$status_params <- renderText({"No data to copy."})
+    }
   })
   
   
@@ -554,17 +624,10 @@ server <- function(input, output, session) {
     sampling_calendar <- sampling_calendar_reactive()
     
     if (!is.null(sampling_calendar)) {
-      # Get current date-time and calendar type
       timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M")
       calendar_type <- ifelse(input$calendar_type == "gregorian", "Gregorian", "Lunar")
-      
-      # Construct the filename
       filename <- paste0("Sampling_calendar_", timestamp, "_", calendar_type, ".csv")
-      
-      # Save the calendar to a CSV file
       write.csv(sampling_calendar, filename, row.names = FALSE)
-      
-      # Update status message
       output$status_calendar <- renderText({paste("Data saved to", filename)})
     } else {
       output$status_calendar <- renderText({"No data to save."})
