@@ -16,6 +16,11 @@ library(kableExtra)
 # Set working directory 
 setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
 
+
+# Define the zone coordinates table to begin with (default), or the name of an empty table.
+default_zone_coords <- "zone_coords.csv"
+default_zone_coords <- "zone_coords_other_zones.csv"
+
 # Define the UI with two tabs: Zone Mapper and Sampling Planner ####
 ui <- navbarPage("Sampling Planner",
                  
@@ -90,7 +95,7 @@ ui <- navbarPage("Sampling Planner",
 server <- function(input, output, session) {
   
   # Load zone coordinates from CSV
-  zone_coords <- read.csv("zone_coords.csv", stringsAsFactors = FALSE)
+  zone_coords <- read.csv(default_zone_coords, stringsAsFactors = FALSE)
   
   # Convert Latitude and Longitude to numeric if needed
   zone_coords$Latitude <- as.numeric(zone_coords$Latitude)
