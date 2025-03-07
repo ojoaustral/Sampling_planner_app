@@ -37,7 +37,7 @@ The app provides an interactive interface for users to:
     ```r
     setwd("path_to_app_directory")
     ```
-4. Make sure you have in the working directory the 'zone_coords.csv' file which can store default zone and sample allocation values to begin with. During a session with the app these values can be deleted/edited to suit you needs, and new values will be remembered in tis file so long changes are seved.
+4. Make sure you have in the working directory the 'zone_coords.csv' file which can store default zone and sample allocation values to begin with. During a session with the app these values can be deleted/edited to suit your needs, and new values will be remembered in this file so long changes are seved.
    
 5. Run the Shiny app:
 

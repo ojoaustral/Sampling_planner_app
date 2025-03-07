@@ -1,3 +1,4 @@
+
 # Load necessary packages
 library(shiny)
 library(leaflet)
@@ -12,14 +13,13 @@ library(tidyverse)
 library(kableExtra)
 
 
-
 # Set working directory 
 setwd("C:/Users/crist/Dropbox/NewAtlantis/Bermuda/Sampling_planer_app/")
 
-
 # Define the zone coordinates table to begin with (default), or the name of an empty table.
-default_zone_coords <- "zone_coords.csv"
-default_zone_coords <- "zone_coords_other_zones.csv"
+# default_zone_coords <- "zone_coords_Empty.csv"
+default_zone_coords <- "zone_coords_Bermuda_1.csv"
+# default_zone_coords <- "zone_coords_Bermuda_2.csv" 
 
 # Define the UI with two tabs: Zone Mapper and Sampling Planner ####
 ui <- navbarPage("Sampling Planner",
