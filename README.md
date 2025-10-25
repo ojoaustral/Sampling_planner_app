@@ -28,10 +28,8 @@ The app provides an interactive interface for users to:
 
 2. Clone this repository:
 
-TODO: There is a typo in the repo name; replace planer by planner.   
-
     ```bash
-    git clone https://github.com/ojoaustral/Sampling_planer_app.git
+    git clone https://github.com/ojoaustral/Sampling_planner_app.git
     ```
 
 3. Open R or RStudio, and set the working directory to the app folder:
